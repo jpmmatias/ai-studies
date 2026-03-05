@@ -17,7 +17,7 @@ didn’t qualify as machine learning because the machines were programmed explic
 to solve the problems instead of being allowed to discover strategies for solving the
 problems by learning from the data. For a long time, many experts believed that
 
-![Veen Diagram](fundamentals/assets/veenDiagramAI.png "Veen Diagram")
+![Veen Diagram](fundamentals/assets/veenDiagramAI.png) 
 
 
 
