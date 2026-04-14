@@ -67,6 +67,8 @@ Em vez de escrever regras manualmente para resolver um problema, em Machine Lear
 2. O algoritmo **aprende padrões**
 3. O modelo passa a **fazer previsões para novos dados**
 
+Convém distinguir **algoritmo** e **modelo**: o algoritmo é o **método** (regras matemáticas e otimização) que percorre os dados para ajustar parâmetros; o **modelo** é o **resultado desse treino** — uma função (ou estrutura parametrizada) que recebe entradas novas e produz previsões sem repetir todo o aprendizado.
+
 Esse paradigma torna os sistemas:
 
 - mais **flexíveis**
@@ -181,6 +183,8 @@ Exemplo:
 
 Em muitos casos, **não existe uma resposta correta imediata**, mas sim uma sequência de ações que leva a um objetivo final.
 
+Em alguns problemas menciona-se ainda **aprendizagem semi-supervisionada**: combina-se um grande volume de dados **sem rótulo** com um subconjunto **rotulado**, situando-se entre os cenários supervisionado e não supervisionado.
+
 ---
 
 # Engenharia de Machine Learning vs. "Magia Negra"
@@ -247,3 +251,100 @@ Isso permite resolver tarefas complexas como:
 Embora seja tecnicamente uma subárea de Machine Learning, **Deep Learning ganhou grande destaque devido ao seu impacto recente na indústria e na pesquisa em IA**.
 
 Um exemplo clássico apresentado em estudos de Deep Learning é um sistema capaz de **aprender a dirigir um carro apenas observando um humano dirigir**, utilizando redes neurais para aprender diretamente a partir de dados visuais.
+
+---
+
+# Redes Neurais
+
+Uma **rede neural artificial (RNA)** é um modelo matemático formado por muitas unidades simples — os **neurônios artificiais** — conectadas entre si. Cada conexão tem um **peso** que o algoritmo **ajusta durante o treinamento**, usando dados, para que a rede passe a mapear entradas (por exemplo, pixels de uma imagem) em saídas úteis (por exemplo, “é um gato” ou “vire à esquerda”).
+
+---
+
+## Do neurônio à rede
+
+Um neurônio típico combina várias **entradas**, multiplica cada uma pelo seu **peso**, soma tudo (muitas vezes com um **viés**, ou *bias*, que desloca a decisão) e passa o resultado por uma **função de ativação**. Essa função introduz **não linearidade**: sem ela, empilhar camadas não aumentaria o poder expressivo do modelo — seria equivalente a uma única transformação linear.
+
+---
+
+## Camadas: entrada, ocultas e saída
+
+As redes são organizadas em **camadas**:
+
+- **Camada de entrada** recebe os dados brutos.
+- **Camadas ocultas** transformam esses dados em representações intermediárias — o mesmo princípio das “bordas → formas → objetos” que vimos em visão computacional.
+- **Camada de saída** produz o resultado da tarefa (classes, valores contínuos, probabilidades etc.).
+
+Quando há **muitas** camadas ocultas, estamos no regime do **Deep Learning**: o modelo fica “profundo” em número de transformações sucessivas.
+
+---
+
+## Como a rede aprende (visão geral)
+
+O treinamento costuma seguir esta ideia: comparar a **previsão** da rede com a **resposta desejada** (nos problemas supervisionados), medir o **erro** e **atualizar os pesos** para reduzi-lo. Na prática, isso é feito com algoritmos de otimização como a **descida de gradiente** (e variantes), que indicam em qual direção alterar cada peso.
+
+O mecanismo clássico para propagar esse ajuste por todas as camadas é a **retropropagação** (*backpropagation*): o erro é calculado na saída e “volta” pela rede para atualizar pesos e vieses de forma coordenada. Não é necessário dominar as fórmulas para entender o papel dela — apenas que **é o processo que torna o aprendizado em profundidade computacionalmente viável**.
+
+---
+
+## Relação com o seu contexto (software e web)
+
+Na prática, você raramente implementará retropropagação à mão; bibliotecas como **TensorFlow.js** encarregam-se da arquitetura, dos gradientes e da aceleração numérica. A secção seguinte resume **o que** essa stack oferece e **como** encaixa no fluxo: dados, treino, avaliação e modelo em produção.
+
+---
+
+# TensorFlow.js e ML no navegador
+
+**TensorFlow.js** é uma biblioteca **open source** em JavaScript, desenvolvida pela Google como **companheira** do TensorFlow em Python. Permite construir fluxos de ML que correm no **navegador** ou no **Node.js** — por exemplo, o usuário pode interagir com um modelo ao abrir uma página, em muitos casos **sem instalar** drivers ou aplicações de sistema.
+
+---
+
+## API em camadas, API de baixo nível e backends
+
+Para treino e inferência, a biblioteca usa tradicionalmente **WebGL** no browser para acelerar operações numéricas. Oferece uma **API de camadas** (*high-level*) para definir modelos de forma declarativa e uma **API de baixo nível** centrada em **álgebra linear** sobre tensores (com raízes no antigo projeto *deeplearn.js*). É comum também **importar** modelos já treinados noutros ambientes (por exemplo, fluxos em TensorFlow ou Keras), quando o formato e a versão são compatíveis com as ferramentas de conversão e carregamento disponíveis.
+
+---
+
+## Tensores: o alvo de todas as operações
+
+No centro da API estão os **tensores**: blocos de dados organizados como **arrays multidimensionais** (valores numéricos ou outros tipos suportados). Propriedades que aparecem em quase todos os exemplos:
+
+- **rank**: número de dimensões do tensor;
+- **shape**: tamanho ao longo de cada dimensão (por exemplo, `[lote, altura, largura, canais]`);
+- **dtype**: tipo dos valores (em muitos tutoriais, por padrão, `float32`).
+
+Cria-se um tensor a partir de arrays JavaScript com `tf.tensor`; existem atalhos como `tf.tensor1d` … `tf.tensor6d` para tornar o número de dimensões explícito. As operações são, em geral, **imutáveis**: somar ou transformar tensores **devolve novos** tensores em vez de alterar os originais.
+
+---
+
+## Memória no browser
+
+Tensores podem residir em buffers acelerados (por exemplo, na GPU via WebGL); acumular tensores sem os libertar pode **crescer o consumo de memória** de forma silenciosa. A API expõe `dispose()` (ou `tf.dispose`) para libertar um tensor e `tf.tidy()` para executar um bloco de operações e **conservar só o resultado final**, descartando intermediários:
+
+```js
+const y = tf.tidy(() => a.square().neg());
+```
+
+---
+
+## Três modos de trabalho com a biblioteca
+
+Uma forma simples de organizar o ecossistema (como em introduções dedicadas ao TensorFlow.js) é pensar em três níveis de esforço:
+
+1. **Modelo pré-treinado**: carregar um modelo já treinado para uma tarefa concreta e fazer só **inferência** no cliente ou no servidor Node.
+2. **Transfer learning** (*transferência de aprendizagem*): partir de um modelo existente e **re-treinar** (ou congelar camadas e treinar um cabeçalho) com dados do seu domínio.
+3. **Criar, treinar e prever em JavaScript**: definir a arquitetura, o laço de treino e a avaliação **no próprio ecossistema JS** — útil para protótipos, demos educativas e produtos com requisitos de privacidade ou latência no cliente.
+
+Em qualquer modo, o fluxo de produto permanece: **dados → treino (quando aplicável) → validação → implantação e monitorização**.
+
+---
+
+## Ligação a obras que aprofundam TensorFlow.js
+
+O livro *Deep Learning with JavaScript* (equipa ligada ao TensorFlow, edição Manning) parte de motivações semelhantes e aprofunda **treino no ecossistema web**, preparação e transformação de dados, visualização de métricas e **generalização** — por exemplo **subajuste** e **sobreajuste** (*underfitting* / *overfitting*) — ou seja, se o modelo serve para dados novos e não só para o conjunto de treino.
+
+---
+
+## Leituras sugeridas
+
+- Gerard, Charlie. *Practical Machine Learning in JavaScript: TensorFlow.js for Web Developers*. Apress, 2021. ISBN 978-1-4842-6417-1.
+- Cai, Shanqing; Bileschi, Stan; Nielsen, Eric; Chollet, François. *Deep Learning with JavaScript*. Manning — útil para aprofundar TensorFlow.js, treino e boas práticas quando tiveres o PDF à mão.
