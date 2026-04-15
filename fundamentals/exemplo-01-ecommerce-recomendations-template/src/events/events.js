@@ -140,9 +140,4 @@ export default class Events {
         document.dispatchEvent(event);
     }
 
-    static onProgressUpdate(callback) {
-        document.addEventListener(events.modelProgressUpdate, (event) => {
-            return callback(event.detail);
-        });
-    }
 }
