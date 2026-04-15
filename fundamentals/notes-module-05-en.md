@@ -1,6 +1,6 @@
 # Module 05 -- Artificial Intelligence on the Web
 
-> Notes on chapters covering **Genetic Algorithms** and **Large Language Models (LLMs)**.
+> Notes on chapters covering **Genetic Algorithms**, **Large Language Models (LLMs)**, **Web AI**, and **Multimodal Web AI**.
 
 ---
 
@@ -642,6 +642,285 @@ When information is missing, the prompt is ambiguous, or the topic is under-repr
 
 ---
 
+# Chapter 3: Web AI — How AI Works in the Browser
+
+## The Web 4.0 vision
+
+The term **Web 4.0** describes a new generation of the internet where artificial intelligence is **native to the browser**. Instead of relying on remote servers, applications can run AI models directly on the user's machine. Models such as Google's **Gemini Nano** and **DeepSeek** are already being used this way.
+
+> Web 4.0 is the vision of a future where browsers become the true operating systems — capable of running AI natively, for free, and in a decentralised fashion.
+
+Key benefits of on-device AI:
+
+- **Privacy:** user data never leaves the device.
+- **Performance:** acceptable latency even for complex tasks, no network round-trip.
+- **Cost:** free inference — no API tokens consumed.
+- **Offline capability:** works without an internet connection after the initial model download.
+
+---
+
+## Chrome Built-in AI APIs
+
+Google has been investing in **experimental APIs** that embed models like **Gemini Nano** directly into the Chrome browser. Once the browser is installed, the model is downloaded once and shared across all origins — eliminating per-site downloads.
+
+### API landscape
+
+| API | Purpose | Status (Chrome 138+) |
+|-----|---------|---------------------|
+| **Prompt API** (`LanguageModel`) | Free-form text generation | Stable (text); Origin Trial (multimodal, Chrome 139–144) |
+| **Translator API** | On-device text translation | Stable |
+| **Language Detector API** | Identify the language of text | Stable |
+| **Summarizer API** | Generate summaries from text | Stable |
+
+All four APIs run **entirely on-device** using WebAssembly and WebGPU — no cloud round-trips are involved.
+
+### Hardware requirements
+
+| Requirement | Minimum |
+|-------------|---------|
+| Disk space | 22 GB free |
+| GPU VRAM | > 4 GB |
+| CPU fallback | 16 GB RAM, 4+ cores |
+| Platforms | Windows 10+, macOS 13+, Linux (no mobile) |
+
+Model status can be inspected at `chrome://on-device-internals`.
+
+---
+
+## The Prompt API in practice
+
+The **Prompt API** (`self.ai.languageModel` or `LanguageModel`) is the primary interface for interacting with Gemini Nano in the browser. It supports creating sessions with system prompts and controlling generation parameters.
+
+### Creating a session and prompting
+
+```js
+const session = await LanguageModel.create({
+  systemPrompt: "You are a helpful assistant specialising in web development.",
+  temperature: 0.7,
+  topK: 40
+});
+
+// Non-streaming
+const answer = await session.prompt("What is the event loop?");
+
+// Streaming (token by token)
+const stream = session.promptStreaming("Explain closures in JavaScript.");
+for await (const chunk of stream) {
+  console.log(chunk);
+}
+```
+
+### Checking availability and monitoring download
+
+```js
+const availability = await LanguageModel.availability();
+// "available" | "downloadable" | "downloading" | "unavailable"
+
+const session = await LanguageModel.create({
+  monitor(m) {
+    m.addEventListener("downloadprogress", (e) => {
+      console.log(`Model download: ${(e.loaded * 100).toFixed(1)}%`);
+    });
+  }
+});
+```
+
+---
+
+## Temperature and Top-K
+
+Two parameters control the **creativity** and **variety** of responses:
+
+**Temperature** rescales the logits before softmax (see Chapter 2):
+
+$$
+P(token_i) = \frac{e^{z_i / T}}{\sum_{j} e^{z_j / T}}
+$$
+
+| Temperature | Behaviour |
+|-------------|-----------|
+| T → 0 | Almost deterministic — always picks the most probable token |
+| T = 1 | Default softmax distribution |
+| T > 1 | Flatter distribution — more diverse, creative output |
+
+**Top-K** limits the candidate pool to the *K* most probable tokens before sampling. A small K yields focused responses; a large K allows more variation.
+
+### Practical example
+
+- **Prompt:** "The sky is..."
+- `temperature=0, topK=1` → "blue" (nearly every time).
+- `temperature=2, topK=10` → "vast", "limitless", "full of stars", etc.
+
+---
+
+## Semantic similarity validation
+
+Recalling the embedding concepts from Chapter 2, Gemini Nano also supports basic semantic reasoning. For example:
+
+- **Prompt:** "King − man + woman = ?"
+- **Result:** "Queen"
+
+This demonstrates that the model's internal embeddings capture analogical relationships, even when running on-device in a lightweight form.
+
+---
+
+## Challenges and limitations
+
+Despite the benefits, on-device AI comes with significant caveats:
+
+| Challenge | Detail |
+|-----------|--------|
+| Model size | Gemma ≈ 2.5 GB, DeepSeek ≈ 1.3 GB — large initial downloads |
+| Mobile experience | Download times can be prohibitive on cellular networks |
+| Browser support | Currently Chrome-only; other browsers lack native support |
+| Model capability | Gemini Nano is optimised for summarisation and classification, not large-scale reasoning |
+| Hardware floor | Requires modern GPU or substantial RAM |
+
+---
+
+# Chapter 4: Web AI Multimodal
+
+## Beyond text: multimodal inputs
+
+**Multimodality** is the ability of an AI system to process and relate different types of data — text, images, and audio — within a single interaction.
+
+> A multimodal model does not merely accept different formats; it can **relate** content across modalities. You can send an image and ask a question about it, and the model understands both.
+
+Examples of multimodal interactions:
+
+- Send an image and ask "What is in this photo?"
+- Send an audio clip and request a transcription.
+- Combine text and image in the same prompt for a contextualised answer.
+
+---
+
+## Chrome Prompt API — multimodal support
+
+Starting with Chrome 139, the Prompt API supports **image and audio inputs** alongside text through an Origin Trial (running through Chrome 144).
+
+### Creating a multimodal session
+
+```js
+// Image support
+const session = await LanguageModel.create({
+  expectedInputs: [{ type: "image" }]
+});
+
+// Audio support (requires GPU with ≥ 4 GB VRAM)
+const audioSession = await LanguageModel.create({
+  expectedInputs: [{ type: "audio" }]
+});
+```
+
+### Sending images in prompts
+
+Images are passed as `ImageBitmap` objects (or directly as `File`/`Blob`):
+
+```js
+const file = document.querySelector("#imgUpload").files[0];
+const imageBitmap = await createImageBitmap(file);
+
+const description = await session.prompt([
+  "Describe the contents of this image in detail.",
+  { type: "image", content: imageBitmap }
+]);
+```
+
+### Structured output with images
+
+Multimodal input can be combined with **JSON schema constraints** to produce structured responses:
+
+```js
+const schema = {
+  type: "object",
+  required: ["tags", "description"],
+  additionalProperties: false,
+  properties: {
+    tags: {
+      description: "Objects identified in the image",
+      type: "array",
+      items: { type: "string" }
+    },
+    description: {
+      description: "One-sentence description of the scene",
+      type: "string"
+    }
+  }
+};
+
+const result = await session.prompt([
+  "Analyse the image and return structured data.",
+  { type: "image", content: imageBitmap }
+], { responseConstraint: schema });
+
+const parsed = JSON.parse(result);
+// { tags: ["man", "laptop", "dog"], description: "A relaxing sunset scene..." }
+```
+
+---
+
+## Practical demonstration
+
+The classroom demo ("Exemplo 05 — Web AI Multimodal") demonstrated capabilities that run **100 % offline** in the browser:
+
+| Input | Result |
+|-------|--------|
+| Photo of a person with a laptop and a dog | Correctly described as "a relaxing sunset scene with a man, a laptop, and a dog" |
+| Image of a CNPJ card (Brazilian tax ID) | Extracted fields: CNPJ number, company name, address, phone, status |
+| Audio recording (English) | Transcribed to text |
+
+---
+
+## Handling language limitations
+
+Although the Prompt API accepts Portuguese text prompts, multimodal features (image and audio) still produce better results in **English**. The workaround demonstrated in class uses the built-in **Translator API** as a bridge:
+
+```
+User input (PT) → Translate to EN → Process with multimodal AI → Output (EN) → Translate back to PT
+```
+
+This round-trip is transparent to the user and completes quickly thanks to on-device translation.
+
+```js
+const translator = await Translator.create({
+  sourceLanguage: "pt",
+  targetLanguage: "en"
+});
+const englishPrompt = await translator.translate(userPromptPT);
+
+const result = await session.prompt([
+  englishPrompt,
+  { type: "image", content: imageBitmap }
+]);
+
+const backTranslator = await Translator.create({
+  sourceLanguage: "en",
+  targetLanguage: "pt"
+});
+const resultPT = await backTranslator.translate(result);
+```
+
+---
+
+## Use cases
+
+| Domain | Application |
+|--------|-------------|
+| **Accessibility** | Automatic alt-text generation, image descriptions for screen readers, audio transcription |
+| **Document processing** | Offline OCR of IDs, invoices, tax documents |
+| **Content moderation** | Verify uploaded images match site topic before submission |
+| **Intelligent assistants** | Site-embedded agents that see, hear, and respond without sending data to servers |
+
+---
+
+## The bigger picture
+
+The ability to run multimodal AI in the browser fundamentally changes how we think about web applications. Assistants can now **see**, **hear**, and **respond** — with acceptable performance and without compromising privacy.
+
+We are at the threshold of a new generation of digital experiences. The future of AI on the web is **local**, **private**, **multimodal**, and **accessible**.
+
+---
+
 ## Suggested readings
 
 ### Chapter 1 — Genetic Algorithms
@@ -662,3 +941,18 @@ When information is missing, the prompt is ambiguous, or the topic is under-repr
 - Andrej Karpathy. "Let's build GPT from scratch." [YouTube](https://www.youtube.com/watch?v=kCc8FmEb1nY)
 - LLM Visualization — [bbycroft.net/llm](https://bbycroft.net/llm)
 - OpenAI Tokenizer — [platform.openai.com/tokenizer](https://platform.openai.com/tokenizer)
+
+### Chapter 3 — Web AI
+
+- Chrome Built-in AI documentation — [developer.chrome.com/docs/ai/built-in](https://developer.chrome.com/docs/ai/built-in)
+- Chrome Prompt API reference — [developers.chrome.com/docs/ai/prompt-api](https://developers.chrome.com/docs/ai/prompt-api)
+- "Build a chatbot with the Prompt API." *web.dev* — [web.dev/articles/ai-chatbot-promptapi](https://web.dev/articles/ai-chatbot-promptapi)
+- Chrome session management best practices — [developers.chrome.com/docs/ai/session-management](https://developers.chrome.com/docs/ai/session-management)
+- "Chrome's Built-In AI: Gemini Nano and Prompt API Complete Guide." *flaming.codes* — [flaming.codes/posts/chrome-gemini-nano-built-in-ai](https://flaming.codes/posts/chrome-gemini-nano-built-in-ai)
+
+### Chapter 4 — Web AI Multimodal
+
+- Chrome Prompt API multimodal Origin Trial — [developer.chrome.com/blog/prompt-multimodal-origin-trial](https://developer.chrome.com/blog/prompt-multimodal-origin-trial)
+- Camden, Raymond. "Multimodal Support in Chrome's Built-in AI." — [raymondcamden.com/2025/05/22/multimodal-support-in-chromes-built-in-ai](https://www.raymondcamden.com/2025/05/22/multimodal-support-in-chromes-built-in-ai)
+- Chrome Translator API — [developer.chrome.com/docs/ai/translator-api](https://developer.chrome.com/docs/ai/translator-api)
+- Chrome Language Detector API — [developer.chrome.com/blog/language-detection-origin-trial](https://developer.chrome.com/blog/language-detection-origin-trial)
