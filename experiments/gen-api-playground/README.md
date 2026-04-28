@@ -33,6 +33,11 @@ Override model or URL if needed:
 MODEL=anthropic/claude-3.5-sonnet node scripts/openrouter-chat.mjs
 ```
 
+## Related notes
+
+- English: [`fundamentals/notes-module-11-en.md`](../../fundamentals/notes-module-11-en.md) · quick ref [`gen-api-quick-ref.md`](../../fundamentals/gen-api-quick-ref.md)
+- Português (pt-BR): [`fundamentals/notes-module-11.md`](../../fundamentals/notes-module-11.md) · referência rápida [`gen-api-quick-ref.pt.md`](../../fundamentals/gen-api-quick-ref.pt.md)
+
 ## Security
 
 - Never commit `.env`.
