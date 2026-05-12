@@ -1,0 +1,17 @@
+{
+  "name": "2-generative-api",
+  "version": "1.0.0",
+  "description": "",
+  "license": "ISC",
+  "author": "",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "node --inspect --watch ./src/index.ts",
+    "start": "node  ./src/index.ts"
+  },
+  "dependencies": {
+    "fastify": "^5.8.5"
+  }
+}

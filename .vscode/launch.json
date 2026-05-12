@@ -1,0 +1,10 @@
+{
+    "configurations": [
+        {
+            "type": "chrome",
+            "name": "ws://127.0.0.1:9229/5f7a08bd-ab8a-4a29-92e5-ae29c925d742",
+            "request": "launch",
+            "url": "ws://127.0.0.1:9229/5f7a08bd-ab8a-4a29-92e5-ae29c925d742"
+        }
+    ]
+}
