@@ -1,7 +1,10 @@
 import fast from "fastify"
+type ChatService = {
+    sendMessage: (message: string) => Promise<unknown>
+}
 
 
-export const createServer = ()=>{
+export const createServer = (openRouterService: ChatService)=>{
     const app = fast()
 
     app.post("/chat",
@@ -24,10 +27,13 @@ export const createServer = ()=>{
             try {
                 
             const {question} = request.body as {question:string}
-            return reply.send("hello!")
+            const res = await openRouterService.sendMessage(question)
+            return reply.send(res)
             } catch (err) {
                 console.error("Error handling /chat requests", err)
-                return reply.code(500)
+                return reply.code(500).send({
+                    error: "Internal server error"
+                })
                 
             }
         }
